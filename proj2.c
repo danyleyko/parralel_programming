@@ -14,51 +14,115 @@ int main (int argc, char *argv[])
     // Create file
     FILE *file = fopen("proj2.out", "w");
     if (file == NULL)
-    {
         error_messages(file, err_open);
-    }
 
     // Parsing Arguments
     args_t args;
     if(parse_args(argc, argv, &args) == false)
-    {
         error_messages(file, err_args);
-    }
 
-    // Initialization semaphores
-    if (init_semaphore() == false)
-    {
-        error_messages(file, err_sem_init);
-    }
-
+    //-----------------------------------------------
+    // Initializations stuff
+    //
     // Initialization memory
     if (init_mem() == false)
-    {
         error_messages(file, err_map);
+
+    // Initialization semaphores
+    //if (init_semaphore() == false)
+        //error_messages(file, err_sem_init);
+    //
+    //-----------------------------------------------
+
+
+    pid_t process = fork();
+    if(process == 0)
+    {
+        processMain(args.F);
+    }
+    else
+    {
+        // Generator 1
+        for (unsigned i = 0; i < args.NZ; ++i) {
+            processCustomer();
+        }
+
+        // Generator 2
+        for (unsigned i = 0; i < args.NU; ++i) {
+            processWorker();
+        }
+
     }
 
-    cleanup(file);
+    // Waiting end of each child processes
+    while(wait(NULL) > 0);
+
+    // Clean MMAP
+    if(cleanup(file) == false)
+        error_messages(file, err_clean);
     return 0;
+}
+
+//
+void processCustomer()
+{
+
+}
+
+//
+void processWorker()
+{
+
+}
+
+//
+void processMain(int F)
+{
+    int ran;
+    srand(time(NULL) * getpid());
+    ran = (rand() % ((F - (F/2) + 1) + (F/2)));
+    ran *= 1000;
+
+    printf("ran - %d\n", ran);
+    printf("pid - %d\n", getpid());
 }
 
 
 /// Clean Up
 /// @brief
 /// @param f
-void cleanup(FILE *file)
+bool cleanup(FILE *file)
 {
-    sem_close(semaphore);
+    // Unmapping SM
+    if(munmap((semaphore), sizeof(semaphore)) == -1)
+    {
+        return false;
+    }
 
+    //sem_close(semaphore);
     sem_unlink("xdanyl00.ios.proj2.sem");
+
+    // Destroying semaphores
+    if(sem_destroy(semaphore) == -1)
+    {
+        return false;
+    }
+
     if (file != NULL)
+    {
         fclose(file);
+    }
+
+    return true;
 }
 
 // Initialization Memory function
 bool init_mem()
 {
     // SM for global variables
-    if((line_log = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED)
+    if(
+    ((line_log = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
+    ((idZ = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED))
     {
         return false;
     }
@@ -75,11 +139,10 @@ bool init_mem()
 // Initialization Semaphore function
 bool init_semaphore()
 {
-//    if ((semaphore = sem_open("/xdanyl00.ios.proj2.semaphore", O_CREAT | O_EXCL, 0666, 1)) == SEM_FAILED)
-//    {
-//        cleanup(file);
-//        return false;
-//    }
+    if ((semaphore = sem_open("/xdanyl00.ios.proj2.semaphore", O_CREAT | O_EXCL, 0666, 1)) == SEM_FAILED)
+    {
+        return false;
+    }
 
     if ((sem_init(semaphore, 1, 0) == -1))
     {
@@ -140,9 +203,15 @@ void error_messages(FILE *file, int error)
             exit(1);
         case err_sem_init:
             fprintf(stderr, "Error: Can't initialization semaphores\n");
+            cleanup(file);
             exit(1);
         case err_map:
             fprintf(stderr, "Error: Shared memory initialization FAILED\n");
             exit(1);
+        case err_clean:
+            fprintf(stderr, "Error: Clean FAILED\n");
+            exit(1);
     }
 }
+
+//void setRandom

@@ -25,6 +25,7 @@
 
 // Shared memory
 int *line_log = NULL; // (*line_log)++;
+int *idZ = NULL; // (*line_log)++;
 
 // Semaphores
 sem_t *semaphore = NULL;
@@ -39,16 +40,21 @@ typedef struct args {
 } args_t;
 
 // Declaration prototype function
-void cleanup(FILE *f);
+bool cleanup(FILE *f);
 bool init_semaphore();
 void error_messages(FILE *f, int error);
 bool parse_args(int argc, char** argv, args_t *args);
 bool init_mem();
+void processCustomer();
+void processWorker();
+void processMain(int F);
+
 
 // Enum Errors
 enum errors{
     err_open,
     err_args,
     err_sem_init,
-    err_map
+    err_map,
+    err_clean
 };
