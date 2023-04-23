@@ -22,16 +22,13 @@ int main (int argc, char *argv[])
         error_messages(file, err_args);
 
     //-----------------------------------------------
-    // Initializations stuff
-    //
     // Initialization memory
     if (init_mem() == false)
         error_messages(file, err_map);
 
     // Initialization semaphores
-    //if (init_semaphore() == false)
-        //error_messages(file, err_sem_init);
-    //
+    if (init_semaphore() == false)
+        error_messages(file, err_sem_init);
     //-----------------------------------------------
 
 
@@ -93,20 +90,25 @@ void processMain(int F)
 /// @param f
 bool cleanup(FILE *file)
 {
-    // Unmapping SM
-    if(munmap((semaphore), sizeof(semaphore)) == -1)
+    // Unmapping SM and Destroy semaphores
+    if(munmap((semaphore), sizeof(semaphore)) == -1 || sem_destroy(semaphore) == -1)
     {
         return false;
     }
+    else
+    {
+        sem_unlink("xdanyl00.ios.proj2.sem");
+        sem_close(semaphore);
+    }
 
-    //sem_close(semaphore);
-    sem_unlink("xdanyl00.ios.proj2.sem");
+
+
 
     // Destroying semaphores
-    if(sem_destroy(semaphore) == -1)
-    {
-        return false;
-    }
+    //if(sem_destroy(semaphore) == -1)
+    //{
+    //    return false;
+    //}
 
     if (file != NULL)
     {
@@ -122,13 +124,17 @@ bool init_mem()
     // SM for global variables
     if(
     ((line_log = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
-    ((idZ = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED))
+    ((idZ = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
+    ((idU = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED)
+    )
     {
         return false;
     }
 
     // SM for semaphores
-    if ((semaphore = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED)
+    if (
+    ((semaphore = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED)
+    )
     {
         return false;
     }
@@ -139,15 +145,14 @@ bool init_mem()
 // Initialization Semaphore function
 bool init_semaphore()
 {
-    if ((semaphore = sem_open("/xdanyl00.ios.proj2.semaphore", O_CREAT | O_EXCL, 0666, 1)) == SEM_FAILED)
-    {
+    //if ((sem_init(semaphore, 1, 0) == -1))
+    //{
+    //    return false;
+    //}
+    semaphore = sem_open("/xdanyl00.ios.proj2.sem", O_CREAT | O_EXCL, 0666, 1);
+    if (semaphore == SEM_FAILED)
         return false;
-    }
 
-    if ((sem_init(semaphore, 1, 0) == -1))
-    {
-        return false;
-    }
     return true;
 }
 

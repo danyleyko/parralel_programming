@@ -25,7 +25,8 @@
 
 // Shared memory
 int *line_log = NULL; // (*line_log)++;
-int *idZ = NULL; // (*line_log)++;
+int *idZ = NULL;
+int *idU = NULL;
 
 // Semaphores
 sem_t *semaphore = NULL;
