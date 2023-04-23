@@ -7,3 +7,4 @@ proj2: proj2.c proj2.h
 
 clean:
 	rm -f *.o proj2
+	rm -f *.o proj2.out

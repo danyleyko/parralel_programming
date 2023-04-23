@@ -1,3 +1,11 @@
+/*
+ * IOS - Projekt 2
+ * Author: Danyleyko Kirill
+ * xlogin: xdanyl00
+ * Date: 20.04.2023
+ * proj2.h
+ */
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <stdbool.h>
@@ -15,7 +23,13 @@
 #include <sys/mman.h>
 #include <errno.h>
 
+// Shared memory
+int *line_log = NULL; // (*line_log)++;
 
+// Semaphores
+sem_t *semaphore = NULL;
+
+// Arguments
 typedef struct args {
     unsigned NZ; // Pocet Zakazniku
     unsigned NU; // Pocet Uredniku
@@ -23,3 +37,18 @@ typedef struct args {
     unsigned TU; // Max cas prestavky    
     unsigned F;  // Max cas v ms, po kterem je uzavrena posta pro nove prichozi     
 } args_t;
+
+// Declaration prototype function
+void cleanup(FILE *f);
+bool init_semaphore();
+void error_messages(FILE *f, int error);
+bool parse_args(int argc, char** argv, args_t *args);
+bool init_mem();
+
+// Enum Errors
+enum errors{
+    err_open,
+    err_args,
+    err_sem_init,
+    err_map
+};
