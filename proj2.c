@@ -31,31 +31,14 @@ int main (int argc, char *argv[])
         error_messages(file, err_sem_init);
     //-----------------------------------------------
 
-    processMain(args.F);
+
 
     pid_t process = fork();
     (*line_log) = 1;
     if(process == 0) {
-
-        // Generator Customers
-        for (unsigned process_index = 0; process_index < args.NZ; ++process_index) {
-            pid_t generateCustomer[args.NZ];
-            generateCustomer[args.NZ] = fork();
-            printf("line_log - %d, generateCustomer[args.NZ] - [%d] \n", *line_log, generateCustomer[args.NZ]);
-
-            if(generateCustomer[args.NZ] > 0) {
-                processCustomer(file, args.TZ, (process_index + 1));
-            }
-            else if(generateCustomer[args.NZ] == -1) {
-                error_messages(file, err_fork);
-            }
-            else{
-                break;
-            }
-        }
+        processMain(file, args.F);
     }
-    else if(process == -1)
-    {
+    else if(process == -1) {
         error_messages(file, err_fork);
     }
     else {
@@ -64,24 +47,40 @@ int main (int argc, char *argv[])
         printf("F - %d\n", args.F);
 
         // Generator Workers
-        for (unsigned process_index = 0; process_index < args.NU; ++process_index)
-        {
-            pid_t generateWorkers[args.NU];
-            generateWorkers[args.NU] = fork();
+        pid_t generateWorkers[args.NU];
+        for (unsigned process_index = 0; process_index < args.NU; ++process_index) {
+            generateWorkers[process_index] = fork();
 
-            if(generateWorkers[args.NU] == 0) {
+            if(generateWorkers[process_index] == 0) {
                 processWorker(file, args.TU, (process_index + 1));
             }
-            else if(generateWorkers[args.NU] == -1) {
+            else if(generateWorkers[process_index] == -1) {
                 error_messages(file, err_fork);
             }
-            else{
+            else {
                 break;
             }
         }
 
+        // Generator Customers
+        pid_t generateCustomer[args.NZ];
+        for (unsigned process_index = 0; process_index < args.NZ; ++process_index) {
+            generateCustomer[process_index] = fork();
 
+            printf("line_log - %d, generateCustomer[%d] - [%d] \n", *line_log, process_index, generateCustomer[process_index]);
+
+            if(generateCustomer[process_index] == 0) {
+                processCustomer(file, args.TZ, (process_index + 1));
+            }
+            else if(generateCustomer[process_index] == -1) {
+                error_messages(file, err_fork);
+            }
+            else {
+                break;
+            }
+        }
     }
+
 
 
     // Waiting end of each child processes
@@ -113,8 +112,8 @@ void processCustomer(FILE *file, int TZ, int idZ)
             usleep(ran);
         }
 
-    randomIdService();
     sem_wait(mutex);
+        randomIdService();
         fprintf(file, "%d: Z %d: entering office for a service %d\n", (*line_log), idZ, (*idService));
         (*line_log)++;
         fflush(file);
@@ -140,14 +139,22 @@ void processWorker(FILE *file, int TU, int idU)
 }
 
 //
-void processMain(int F)
+void processMain(FILE *file, int F)
 {
     int ran;
     srand(time(NULL) * getpid());
     ran = (rand() % ((F - (F/2) + 1) + (F/2)));
     ran *= 1000;
+    usleep(ran);
 
     printf("ran - %d\n", ran);
+
+    sem_wait(mutex);
+        fprintf(file, "%d: closing\n", (*line_log));
+        fflush(file);
+        (*line_log)++;
+    sem_post(mutex);
+
 }
 
 // Initialization Memory function

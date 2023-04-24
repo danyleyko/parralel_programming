@@ -48,7 +48,7 @@ bool parse_args(int argc, char** argv, args_t *args);
 bool init_mem();
 void processCustomer(FILE *file, int TZ, int process_index);
 void processWorker(FILE *file, int TU, int process_index);
-void processMain(int F);
+void processMain(FILE *file, int F);
 void randomIdService();
 
 
