@@ -46,39 +46,33 @@ int main (int argc, char *argv[])
         printf("NU - %d\n", args.NU);
         printf("F - %d\n", args.F);
 
-        // Generator Workers
-        pid_t generateWorkers[args.NU];
-        for (unsigned process_index = 0; process_index < args.NU; ++process_index) {
-            generateWorkers[process_index] = fork();
+        //@TODO: Fix logic for loop
+        // Generator
+        pid_t generator; //
+        //process_index < (args.NU + args.NZ)
+        for (unsigned process_index = 0; (process_index < args.NU && process_index < args.NZ) ; process_index++) {
+            generator = fork();
+            printf("line_log - %d, generateCustomer[%d] - [%d] \n", *line_log, process_index, generator);
 
-            if(generateWorkers[process_index] == 0) {
-                processWorker(file, args.TU, (process_index + 1));
+            if(generator == 0) {
+                //if(process_index < args.NZ)
+                    processCustomer(file, args.TZ, (process_index + 1));
             }
-            else if(generateWorkers[process_index] == -1) {
+            else if(generator == -1) {
                 error_messages(file, err_fork);
             }
             else {
+                //if(process_index < args.NU)
+                    processWorker(file, args.TU, (process_index + 1));
+                printf("getpid() - %d\n",getpid());
                 break;
             }
+
+            //if((process_index < args.NU && process_index < args.NZ))
+                //continue;
         }
 
-        // Generator Customers
-        pid_t generateCustomer[args.NZ];
-        for (unsigned process_index = 0; process_index < args.NZ; ++process_index) {
-            generateCustomer[process_index] = fork();
 
-            printf("line_log - %d, generateCustomer[%d] - [%d] \n", *line_log, process_index, generateCustomer[process_index]);
-
-            if(generateCustomer[process_index] == 0) {
-                processCustomer(file, args.TZ, (process_index + 1));
-            }
-            else if(generateCustomer[process_index] == -1) {
-                error_messages(file, err_fork);
-            }
-            else {
-                break;
-            }
-        }
     }
 
 
@@ -102,23 +96,23 @@ void processCustomer(FILE *file, int TZ, int idZ)
         (*line_log)++;
         fflush(file);
     sem_post(mutex);
-
-    //while()
+    printf("POST - %d\n", (*postClose));
+    //while((*postClose) == 1)
     //{
-        if(TZ != 0) {
-            srand(time(NULL) * getpid());
-            ran = (rand() % TZ);
-            ran *= 1000;
-            usleep(ran);
-        }
+            if(TZ != 0) {
+                srand(time(NULL) * getpid());
+                ran = (rand() % TZ);
+                ran *= 1000;
 
-    sem_wait(mutex);
-        randomIdService();
-        fprintf(file, "%d: Z %d: entering office for a service %d\n", (*line_log), idZ, (*idService));
-        (*line_log)++;
-        fflush(file);
-    sem_post(mutex);
+            }
 
+        usleep(ran);
+        sem_wait(mutex);
+            randomIdService();
+            fprintf(file, "%d: Z %d: entering office for a service %d\n", (*line_log), idZ, (*idService));
+            (*line_log)++;
+            fflush(file);
+        sem_post(mutex);
     //}
 
 }
@@ -150,10 +144,13 @@ void processMain(FILE *file, int F)
     printf("ran - %d\n", ran);
 
     sem_wait(mutex);
+        (*postClose) = 0;
         fprintf(file, "%d: closing\n", (*line_log));
         fflush(file);
         (*line_log)++;
     sem_post(mutex);
+    printf("POST - %d\n", (*postClose));
+
 
 }
 
@@ -163,7 +160,8 @@ bool init_mem()
     // SM for global variables
     if(
     ((line_log = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
-    ((idService = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) //||
+    ((idService = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
+    ((postClose = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) //||
     ) {
         return false;
     }
@@ -176,6 +174,7 @@ bool init_mem()
         return false;
     }
 
+    (*postClose) = 1;
     return true;
 }
 
@@ -213,6 +212,13 @@ bool cleanup(FILE *file)
         sem_close(customerSem);
     }
 
+    if(
+    (munmap((line_log), sizeof(line_log)))  ||
+    (munmap((idService), sizeof(line_log)))  ||
+    (munmap((postClose), sizeof(line_log)))  //||
+    ){
+        return false;
+    }
 
     if (file != NULL) {
         fclose(file);

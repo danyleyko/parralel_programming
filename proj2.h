@@ -26,6 +26,7 @@
 // Shared memory
 int *line_log = NULL;
 int *idService = NULL;
+int *postClose = NULL;
 
 // Semaphores
 sem_t *mutex = NULL;
