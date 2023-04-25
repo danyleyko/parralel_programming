@@ -48,28 +48,28 @@ int main (int argc, char *argv[])
 
         //@TODO: Fix logic for loop
         // Generator
-        pid_t generator; //
+        pid_t generator; //(process_index < args.NU && process_index < args.NZ)
         //process_index < (args.NU + args.NZ)
-        for (unsigned process_index = 0; (process_index < args.NU && process_index < args.NZ) ; process_index++) {
+        for (unsigned process_index = 0; process_index < (args.NU + args.NZ) ; process_index++) {
             generator = fork();
             printf("line_log - %d, generateCustomer[%d] - [%d] \n", *line_log, process_index, generator);
 
             if(generator == 0) {
-                //if(process_index < args.NZ)
+                if(process_index < args.NZ)
                     processCustomer(file, args.TZ, (process_index + 1));
             }
             else if(generator == -1) {
                 error_messages(file, err_fork);
             }
             else {
-                //if(process_index < args.NU)
+                if(process_index < args.NU)
                     processWorker(file, args.TU, (process_index + 1));
                 printf("getpid() - %d\n",getpid());
                 break;
             }
 
-            //if((process_index < args.NU && process_index < args.NZ))
-                //continue;
+            if((process_index < args.NU && process_index < args.NZ))
+                continue;
         }
 
 
@@ -113,6 +113,19 @@ void processCustomer(FILE *file, int TZ, int idZ)
             (*line_log)++;
             fflush(file);
         sem_post(mutex);
+
+        sem_wait(mutex);
+            fprintf(file, "%d: Z %d: called by office worker\n", (*line_log), idZ);
+            (*line_log)++;
+            fflush(file);
+        sem_post(mutex);
+
+        sem_wait(mutex);
+            randomWaitingTime(); // Random time usleep in interval <0,10>
+            fprintf(file, "%d: Z %d: going home\n", (*line_log), idZ);
+            (*line_log)++;
+            fflush(file);
+        sem_post(mutex);
     //}
 
 }
@@ -130,6 +143,19 @@ void processWorker(FILE *file, int TU, int idU)
         printf("TU - %d\n", TU);
     }
 
+    sem_wait(mutex);
+        randomIdService();
+        fprintf(file, "%d: U %d: serving a service of type %d\n", (*line_log), idU, (*idService));
+        (*line_log)++;
+        fflush(file);
+    sem_post(mutex);
+
+    sem_wait(mutex);
+        randomWaitingTime(); // Random time usleep in interval <0,10>
+        fprintf(file, "%d: U %d: service finished\n", (*line_log), idU);
+        (*line_log)++;
+        fflush(file);
+    sem_post(mutex);
 }
 
 //
@@ -296,4 +322,9 @@ void error_messages(FILE *file, int error)
 void randomIdService(){
     int ran = (rand() % 3) + 1;
     (*idService) = ran;
+}
+
+void randomWaitingTime(){
+    int ran = (rand() % 11);
+    usleep(ran * 1000);
 }

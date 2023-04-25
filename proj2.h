@@ -51,6 +51,7 @@ void processCustomer(FILE *file, int TZ, int process_index);
 void processWorker(FILE *file, int TU, int process_index);
 void processMain(FILE *file, int F);
 void randomIdService();
+void randomWaitingTime();
 
 
 // Enum Errors
