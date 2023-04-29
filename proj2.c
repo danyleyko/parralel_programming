@@ -85,24 +85,27 @@ void processCustomer(FILE *file, int TZ, int idZ)
     int ran = 0;
     if(TZ != 0) {
         srand(time(NULL) * getpid());
-        ran = (rand() % TZ); // Random time in interval <0 , TZ>
+        ran = (rand() % TZ) + 1; // Random time in interval <0 , TZ>
         ran *= 1000;
     }
+    (queueList[1])++;
 
-    sem_wait(mutex);
+    // Z Start
+    sem_wait(print_sem);
 
         fprintf(file, "%d: Z %d: started\n", (*line_log), idZ);
         (*line_log)++;
         fflush(file);
 
-    sem_post(mutex);
+    sem_post(print_sem);
+    printf("POST - %d\n", (*postOpened));
 
-    //while((*postClose) == 0)
-    //{
-        usleep(ran); // @ran: Random time in interval <0 , TZ>
+    usleep(ran); // @ran: Random time in interval <0 , TZ>
 
+    if((*postOpened))
+    {
         // Z pick service
-        sem_wait(mutex);
+        sem_wait(print_sem);
             randomIdService();
             fprintf(file, "%d: Z %d: entering office for a service %d\n", (*line_log), idZ, (*idService));
             (*line_log)++;
@@ -119,25 +122,25 @@ void processCustomer(FILE *file, int TZ, int idZ)
 //                    sem_post(third_queue);
 //                    break;
 //            }
-        sem_post(mutex);
+        sem_post(print_sem);
 
         // Z called
-        sem_wait(mutex);
+        sem_wait(print_sem);
             fprintf(file, "%d: Z %d: called by office worker\n", (*line_log), idZ);
             (*line_log)++;
             fflush(file);
             randomWaitingTime(); // Random time usleep in interval <0 , 10>
-        sem_post(mutex);
+        sem_post(print_sem);
 
 
-    //}
+    }
 
     // Z go home
-    sem_wait(mutex);
+    sem_wait(print_sem);
         fprintf(file, "%d: Z %d: going home\n", (*line_log), idZ);
         (*line_log)++;
         fflush(file);
-    sem_post(mutex);
+    sem_post(print_sem);
 
     // End process with 0
     //exit(0);
@@ -153,21 +156,21 @@ void processWorker(FILE *file, int TU, int idU)
         ran *= 1000;
 
     }
-
+    (queueList[2])++;
     // START
-    sem_wait(mutex);
+    sem_wait(print_sem);
         fprintf(file, "%d: U %d: started\n", (*line_log), idU);
         fflush(file);
         (*line_log)++;
-    sem_post(mutex);
+    sem_post(print_sem);
 
     // SERVE START
-    sem_wait(mutex);
+    sem_wait(print_sem);
         randomIdService();
         fprintf(file, "%d: U %d: serving a service of type %d\n", (*line_log), idU, (*idService));
         (*line_log)++;
         fflush(file);
-    sem_post(mutex);
+    sem_post(print_sem);
 
 //    switch ((*idService)) {
 //        case 1:
@@ -182,35 +185,35 @@ void processWorker(FILE *file, int TU, int idU)
 //    }
 
     // SERVE END
-    sem_wait(mutex);
+    sem_wait(print_sem);
         randomWaitingTime(); // Random time usleep in interval <0 , 10>
         fprintf(file, "%d: U %d: service finished\n", (*line_log), idU);
         (*line_log)++;
         fflush(file);
-    sem_post(mutex);
+    sem_post(print_sem);
 
     // BREAK START
-    sem_wait(mutex);
+    sem_wait(print_sem);
         fprintf(file, "%d: U %d: taking break\n", (*line_log), idU);
         (*line_log)++;
         fflush(file);
-    sem_post(mutex);
+    sem_post(print_sem);
 
     usleep(ran); // @ran: Random time in interval <0 , TU>
 
     // BREAK END
-    sem_wait(mutex);
+    sem_wait(print_sem);
         fprintf(file, "%d: U %d: break finished\n", (*line_log), idU);
         (*line_log)++;
         fflush(file);
-    sem_post(mutex);
+    sem_post(print_sem);
 
     //if()
-    sem_wait(mutex);
+    sem_wait(print_sem);
         fprintf(file, "%d: U %d: going home\n", (*line_log), idU);
         (*line_log)++;
         fflush(file);
-    sem_post(mutex);
+    sem_post(print_sem);
 
     // End process with 0
     //exit(0);
@@ -226,17 +229,20 @@ void processMain(FILE *file, int F)
 
     usleep(ran); // @ran: Random time in interval <F/2 , F>
 
-    printf("ran - %d\n", ran);
+    printf("POST time working - %d milliseconds\n", ran);
 
-    sem_wait(mutex);
+    sem_wait(print_sem);
         fprintf(file, "%d: closing\n", (*line_log));
         fflush(file);
         (*line_log)++;
-        (*postClose) = 1;
-    sem_post(mutex);
+        (*postOpened) = false;
+    sem_post(print_sem);
 
-    printf("POST - %d\n", (*postClose));
+    printf("POST - %d\n", (*postOpened));
 
+    for (unsigned i = 0; i < sizeof(*queueList); ++i) {
+        printf("arr - %c\n", (queueList[i]));
+    }
     // End process with 0
     //exit(0);
 }
@@ -248,14 +254,15 @@ bool init_mem()
     if(
     ((line_log = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
     ((idService = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
-    ((postClose = mmap(NULL, sizeof(int), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) //||
+    ((postOpened = mmap(NULL, sizeof(bool), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0)) == MAP_FAILED) ||
+    ((queueList = mmap(NULL, sizeof(int) * 3, PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, -1, 0) ) == MAP_FAILED) //||
     ) {
         return false;
     }
 
     // SM for semaphores
     if (
-    ((mutex = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
+    ((print_sem = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
     ((first_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
     ((second_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
     ((third_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED)
@@ -263,15 +270,18 @@ bool init_mem()
         return false;
     }
 
-    (*postClose) = 0;
+    (*postOpened) = true;
+    for (unsigned i = 0; i < sizeof(*queueList); ++i) {
+        (queueList[i]) = 0;
+    }
     return true;
 }
 
 // Initialization Semaphore function
 bool init_semaphore()
 {
-    mutex = sem_open("/xdanyl00.ios.proj2.mut", O_CREAT | O_EXCL, 0666, 1);
-    if (mutex == SEM_FAILED)
+    print_sem = sem_open("/xdanyl00.ios.proj2.printSem", O_CREAT | O_EXCL, 0666, 1);
+    if (print_sem == SEM_FAILED)
         return false;
 
     first_queue = sem_open("/xdanyl00.ios.proj2.firstQueueSem", O_CREAT | O_EXCL, 0666, 0);
@@ -279,11 +289,11 @@ bool init_semaphore()
         return false;
 
     second_queue = sem_open("/xdanyl00.ios.proj2.secondQueueSem", O_CREAT | O_EXCL, 0666, 0);
-    if (first_queue == SEM_FAILED)
+    if (second_queue == SEM_FAILED)
         return false;
 
     third_queue = sem_open("/xdanyl00.ios.proj2.thirdQueueSem", O_CREAT | O_EXCL, 0666, 0);
-    if (first_queue == SEM_FAILED)
+    if (third_queue == SEM_FAILED)
         return false;
 
 //    if(
@@ -307,7 +317,7 @@ bool cleanup(FILE *file)
 {
     // Unmapping SM and Destroy semaphores
     if(
-    (munmap((mutex), sizeof(mutex)) == -1) ||
+    (munmap((print_sem), sizeof(print_sem)) == -1) ||
     (munmap((first_queue), sizeof(first_queue)) == -1) ||
     (munmap((second_queue), sizeof(second_queue)) == -1) ||
     (munmap((third_queue), sizeof(third_queue)) == -1)
@@ -315,8 +325,8 @@ bool cleanup(FILE *file)
         return false;
     }
     else {
-        sem_unlink("xdanyl00.ios.proj2.mut");
-        sem_close(mutex);
+        sem_unlink("/xdanyl00.ios.proj2.printSem");
+        sem_close(print_sem);
 
         sem_unlink("/xdanyl00.ios.proj2.firstQueueSem");
         sem_close(first_queue);
@@ -330,8 +340,9 @@ bool cleanup(FILE *file)
 
     if(
     (munmap((line_log), sizeof(line_log)))  ||
-    (munmap((idService), sizeof(line_log)))  ||
-    (munmap((postClose), sizeof(line_log)))  //||
+    (munmap((idService), sizeof(idService)))  ||
+    (munmap((postOpened), sizeof(postOpened)))  ||
+    (munmap((queueList), sizeof(queueList)))  //||
     ){
         return false;
     }
@@ -419,6 +430,6 @@ void randomIdService(){
 
 void randomWaitingTime(){
     srand(time(NULL) * getpid());
-    int ran = (rand() % 11);
+    int ran = (rand() % 10) + 1;
     usleep(ran * 1000);
 }

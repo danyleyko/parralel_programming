@@ -26,10 +26,11 @@
 // Shared memory
 int *line_log = NULL;
 int *idService = NULL;
-int *postClose = NULL;
+bool *postOpened = NULL;
+int *queueList = NULL;
 
 // Semaphores
-sem_t *mutex = NULL;
+sem_t *print_sem = NULL;
 sem_t *first_queue = NULL;
 sem_t *second_queue = NULL;
 sem_t *third_queue = NULL;
