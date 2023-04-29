@@ -47,7 +47,7 @@ int main (int argc, char *argv[])
         pid_t generator;
         for (unsigned process_index = 0; process_index < (args.NU + args.NZ) ; process_index++) {
             generator = fork();
-            printf("line_log - %d, generateCustomer[%d] - [%d] \n", *line_log, process_index, generator);
+            printf("line_log - %d, index[%d] - [%d] \n", *line_log, process_index, generator);
 
             if(generator == 0) {
                 if(process_index < args.NZ)
@@ -90,35 +90,38 @@ void processCustomer(FILE *file, int TZ, int idZ)
     }
 
     sem_wait(mutex);
-    fprintf(file, "%d: Z %d: started\n", (*line_log), idZ);
-    (*line_log)++;
-    fflush(file);
+
+        fprintf(file, "%d: Z %d: started\n", (*line_log), idZ);
+        (*line_log)++;
+        fflush(file);
+
     sem_post(mutex);
 
     //while((*postClose) == 0)
     //{
         usleep(ran); // @ran: Random time in interval <0 , TZ>
 
+        // Z pick service
         sem_wait(mutex);
             randomIdService();
             fprintf(file, "%d: Z %d: entering office for a service %d\n", (*line_log), idZ, (*idService));
             (*line_log)++;
             fflush(file);
 
-        switch ((*idService)) {
-            case 1:
-                sem_wait(first_queue);
-                break;
-            case 2:
-                sem_wait(second_queue);
-                break;
-            case 3:
-                sem_wait(third_queue);
-                break;
-        }
-
+//            switch ((*idService)) {
+//                case 1:
+//                    sem_post(first_queue);
+//                    break;
+//                case 2:
+//                    sem_post(second_queue);
+//                    break;
+//                case 3:
+//                    sem_post(third_queue);
+//                    break;
+//            }
         sem_post(mutex);
 
+        // Z called
         sem_wait(mutex);
             fprintf(file, "%d: Z %d: called by office worker\n", (*line_log), idZ);
             (*line_log)++;
@@ -129,6 +132,7 @@ void processCustomer(FILE *file, int TZ, int idZ)
 
     //}
 
+    // Z go home
     sem_wait(mutex);
         fprintf(file, "%d: Z %d: going home\n", (*line_log), idZ);
         (*line_log)++;
@@ -163,20 +167,19 @@ void processWorker(FILE *file, int TU, int idU)
         fprintf(file, "%d: U %d: serving a service of type %d\n", (*line_log), idU, (*idService));
         (*line_log)++;
         fflush(file);
-
-        switch ((*idService)) {
-            case 1:
-                sem_post(first_queue);
-                break;
-            case 2:
-                sem_post(second_queue);
-                break;
-            case 3:
-                sem_post(third_queue);
-                break;
-        }
-
     sem_post(mutex);
+
+//    switch ((*idService)) {
+//        case 1:
+//            sem_wait(first_queue);
+//            break;
+//        case 2:
+//            sem_wait(second_queue);
+//            break;
+//        case 3:
+//            sem_wait(third_queue);
+//            break;
+//    }
 
     // SERVE END
     sem_wait(mutex);
@@ -231,6 +234,7 @@ void processMain(FILE *file, int F)
         (*line_log)++;
         (*postClose) = 1;
     sem_post(mutex);
+
     printf("POST - %d\n", (*postClose));
 
     // End process with 0
@@ -270,17 +274,28 @@ bool init_semaphore()
     if (mutex == SEM_FAILED)
         return false;
 
-    first_queue = sem_open("/xdanyl00.ios.proj2.firstQueueSem", O_CREAT | O_EXCL, 0666, 1);
+    first_queue = sem_open("/xdanyl00.ios.proj2.firstQueueSem", O_CREAT | O_EXCL, 0666, 0);
     if (first_queue == SEM_FAILED)
         return false;
 
-    second_queue = sem_open("/xdanyl00.ios.proj2.secondQueueSem", O_CREAT | O_EXCL, 0666, 1);
+    second_queue = sem_open("/xdanyl00.ios.proj2.secondQueueSem", O_CREAT | O_EXCL, 0666, 0);
     if (first_queue == SEM_FAILED)
         return false;
 
-    third_queue = sem_open("/xdanyl00.ios.proj2.thirdQueueSem", O_CREAT | O_EXCL, 0666, 1);
+    third_queue = sem_open("/xdanyl00.ios.proj2.thirdQueueSem", O_CREAT | O_EXCL, 0666, 0);
     if (first_queue == SEM_FAILED)
         return false;
+
+//    if(
+//    (sem_init(mutex, 1, 1)) == -1 ||
+//    (sem_init(first_queue, 1, 0)) == -1 ||
+//    (sem_init(second_queue, 1, 0)) == -1 ||
+//    (sem_init(third_queue, 1, 0)) == -1
+//    )
+//    {
+//        return false;
+//    }
+
 
     return true;
 }
@@ -292,10 +307,10 @@ bool cleanup(FILE *file)
 {
     // Unmapping SM and Destroy semaphores
     if(
-    (munmap((mutex), sizeof(mutex)) == -1 || sem_destroy(mutex) == -1) ||
-    (munmap((first_queue), sizeof(first_queue)) == -1 || sem_destroy(mutex) == -1) ||
-    (munmap((second_queue), sizeof(second_queue)) == -1 || sem_destroy(mutex) == -1) ||
-    (munmap((third_queue), sizeof(third_queue)) == -1 || sem_destroy(mutex) == -1)
+    (munmap((mutex), sizeof(mutex)) == -1) ||
+    (munmap((first_queue), sizeof(first_queue)) == -1) ||
+    (munmap((second_queue), sizeof(second_queue)) == -1) ||
+    (munmap((third_queue), sizeof(third_queue)) == -1)
     ) {
         return false;
     }
@@ -397,11 +412,13 @@ void error_messages(FILE *file, int error)
 
 //
 void randomIdService(){
+    srand(time(NULL) * getpid());
     int ran = (rand() % 3) + 1;
     (*idService) = ran;
 }
 
 void randomWaitingTime(){
+    srand(time(NULL) * getpid());
     int ran = (rand() % 11);
     usleep(ran * 1000);
 }
