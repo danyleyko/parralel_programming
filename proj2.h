@@ -34,6 +34,7 @@ sem_t *print_sem = NULL;
 sem_t *first_queue = NULL;
 sem_t *second_queue = NULL;
 sem_t *third_queue = NULL;
+//sem_t *queue[3] = NULL;
 
 
 // Arguments
@@ -55,7 +56,9 @@ void processCustomer(FILE *file, int TZ, int process_index);
 void processWorker(FILE *file, int TU, int process_index);
 void processMain(FILE *file, int F);
 void randomIdService();
+int randomQueuePick();
 void randomWaitingTime();
+bool queueIsNULL();
 
 
 // Enum Errors
