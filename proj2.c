@@ -62,8 +62,6 @@ int main (int argc, char *argv[])
         }
     }
 
-    // Waiting end of each child processes
-    //while(wait(NULL) != -1);
 
     // Clean MMAP
     if(cleanup(file) == false)
@@ -71,13 +69,14 @@ int main (int argc, char *argv[])
     return 0;
 }
 
-//
+// Process for Customers
 void processCustomer(FILE *file, int TZ, int idZ)
 {
+    // Random time in interval <0 , TZ>
     int ran = 0;
     if(TZ != 0) {
         srand(time(NULL) * getpid());
-        ran = (rand() % TZ) + 1; // Random time in interval <0 , TZ>
+        ran = (rand() % TZ) + 1;
         ran *= 1000;
     }
 
@@ -101,6 +100,7 @@ void processCustomer(FILE *file, int TZ, int idZ)
             (queueList[(*idService)])++;
         sem_post(print_sem);
 
+        // Switch for queue
         switch ((*idService)) {
             case 1:
                 sem_wait(first_queue);
@@ -120,9 +120,7 @@ void processCustomer(FILE *file, int TZ, int idZ)
             fflush(file);
             randomWaitingTime(); // Random time usleep in interval <0 , 10>
         sem_post(print_sem);
-
     }
-
 
     // Z go home
     sem_wait(print_sem);
@@ -135,7 +133,7 @@ void processCustomer(FILE *file, int TZ, int idZ)
     exit(0);
 }
 
-//
+// Process for Worker
 void processWorker(FILE *file, int TU, int idU)
 {
     bool CustomerServed = false;
@@ -168,6 +166,7 @@ void processWorker(FILE *file, int TU, int idU)
                 fflush(file);
             sem_post(print_sem);
 
+            // Switch for queue
             switch ((*idService)) {
                 case 1:
                     sem_post(first_queue);
@@ -183,7 +182,6 @@ void processWorker(FILE *file, int TU, int idU)
                     (queueList[(queueServe)])--;
                     break;
             }
-
 
             // SERVE END
             sem_wait(print_sem);
@@ -211,7 +209,6 @@ void processWorker(FILE *file, int TU, int idU)
                 (*line_log)++;
                 fflush(file);
             sem_post(print_sem);
-
         }
         else if(!(*postOpened)) {
             sem_wait(print_sem);
@@ -225,18 +222,22 @@ void processWorker(FILE *file, int TU, int idU)
     }
 }
 
-//
+// Process Main
 void processMain(FILE *file, int F)
 {
+    // Random time in interval <F/2 , F>
     int ran;
-    srand(time(NULL) * getpid());
-    ran = (rand() % ((F - (F/2) + 1) + (F/2)));
-    ran *= 1000;
+    if(F != 0){
+        srand(time(NULL) * getpid());
+        ran = (rand() % ((F - (F/2) + 1) + (F/2)));
+        ran *= 1000;
+    }
 
     usleep(ran); // @ran: Random time in interval <F/2 , F>
 
     printf("POST time working - %d microseconds\n", ran);
 
+    // POST CLOSING
     sem_wait(print_sem);
         fprintf(file, "%d: closing\n", (*line_log));
         fflush(file);
@@ -329,7 +330,6 @@ bool cleanup(FILE *file)
 
         sem_unlink("/xdanyl00.ios.proj2.thirdQueueSem");
         sem_close(third_queue);
-
     }
 
     if(
@@ -359,11 +359,25 @@ bool parse_args(int argc, char** argv, args_t *args)
     char *end;
     long arg;
 
+
+    // Checking if arhuments isdigit()
+    for (int i = 1; i < argc; ++i) {
+        for (int j = 0; argv[i][j] != '\0'; ++j) {
+            if(!(isdigit(argv[i][j]))) {
+                return false;
+            }
+        }
+    }
+
     arg = strtol(argv[1], &end, 10);
     args->NZ = arg;
+    if(arg == 0)
+        exit(1);
 
     arg = strtol(argv[2], &end, 10);
     args->NU = arg;
+    if(arg == 0)
+        exit(1);
 
     arg = strtol(argv[3], &end, 10);
     if (arg >= 0 && arg <= 10000)
