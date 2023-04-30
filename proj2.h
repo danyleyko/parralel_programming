@@ -34,7 +34,6 @@ sem_t *print_sem = NULL;
 sem_t *first_queue = NULL;
 sem_t *second_queue = NULL;
 sem_t *third_queue = NULL;
-//sem_t *queue[3] = NULL;
 
 
 // Arguments

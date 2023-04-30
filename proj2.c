@@ -31,8 +31,6 @@ int main (int argc, char *argv[])
         error_messages(file, err_sem_init);
     //-----------------------------------------------
 
-
-
     pid_t process = fork();
     (*line_log) = 1;
     if(process == 0) {
@@ -42,12 +40,10 @@ int main (int argc, char *argv[])
         error_messages(file, err_fork);
     }
     else {
-
         // Generator
         pid_t generator;
-        for (unsigned process_index = 0; process_index < (args.NU + args.NZ) ; process_index++) {
+        for (unsigned process_index = 0; process_index != (args.NU + args.NZ) ; process_index++) {
             generator = fork();
-            printf("line_log - %d, index[%d] - [%d] \n", *line_log, process_index, generator);
 
             if(generator == 0) {
                 if(process_index < args.NZ)
@@ -59,17 +55,15 @@ int main (int argc, char *argv[])
             else {
                 if(process_index < args.NU)
                     processWorker(file, args.TU, (process_index + 1));
-                printf("getpid() - %d\n",getpid());
-                break;
             }
 
-            if((process_index < args.NU && process_index < args.NZ))
+            if((process_index > args.NU && process_index == args.NZ))
                 break;
         }
     }
 
     // Waiting end of each child processes
-    //while(wait(NULL) > 0);
+    //while(wait(NULL) != -1);
 
     // Clean MMAP
     if(cleanup(file) == false)
@@ -93,8 +87,6 @@ void processCustomer(FILE *file, int TZ, int idZ)
         (*line_log)++;
         fflush(file);
     sem_post(print_sem);
-
-    printf("POST - %d\n", (*postOpened));
 
     usleep(ran); // @ran: Random time in interval <0 , TZ>
 
@@ -129,8 +121,8 @@ void processCustomer(FILE *file, int TZ, int idZ)
             randomWaitingTime(); // Random time usleep in interval <0 , 10>
         sem_post(print_sem);
 
-
     }
+
 
     // Z go home
     sem_wait(print_sem);
@@ -140,19 +132,19 @@ void processCustomer(FILE *file, int TZ, int idZ)
     sem_post(print_sem);
 
     // End process with 0
-    //exit(0);
+    exit(0);
 }
 
 //
 void processWorker(FILE *file, int TU, int idU)
 {
+    bool CustomerServed = false;
     int queueServe = 0;
     int ran = 0;
     if(TU != 0) {
         srand(time(NULL) * getpid());
         ran = (rand() % TU); // Random time in interval <0,TU>
         ran *= 1000;
-
     }
 
     // START
@@ -167,7 +159,6 @@ void processWorker(FILE *file, int TU, int idU)
         if(!queueIsNULL()){
 
             queueServe = randomQueuePick();
-            printf("\n\n\nqueueServe - %d\n\n\n", queueServe);
 
             // SERVE START
             sem_wait(print_sem);
@@ -200,38 +191,38 @@ void processWorker(FILE *file, int TU, int idU)
                 fprintf(file, "%d: U %d: service finished\n", (*line_log), idU);
                 (*line_log)++;
                 fflush(file);
+                CustomerServed = true;
             sem_post(print_sem);
         }
         // if Queue is NULL, then break
-        else if(queueIsNULL() && (*postOpened)){
+        else if(queueIsNULL() && (*postOpened) && !CustomerServed ){
             // BREAK START
             sem_wait(print_sem);
-            fprintf(file, "%d: U %d: taking break\n", (*line_log), idU);
-            (*line_log)++;
-            fflush(file);
+                fprintf(file, "%d: U %d: taking break\n", (*line_log), idU);
+                (*line_log)++;
+                fflush(file);
             sem_post(print_sem);
 
             usleep(ran); // @ran: Random time in interval <0 , TU>
 
             // BREAK END
             sem_wait(print_sem);
-            fprintf(file, "%d: U %d: break finished\n", (*line_log), idU);
-            (*line_log)++;
-            fflush(file);
+                fprintf(file, "%d: U %d: break finished\n", (*line_log), idU);
+                (*line_log)++;
+                fflush(file);
             sem_post(print_sem);
 
         }
-        else if(!(*postOpened) && queueIsNULL()) {
+        else if(!(*postOpened)) {
             sem_wait(print_sem);
-            fprintf(file, "%d: U %d: going home\n", (*line_log), idU);
-            (*line_log)++;
-            fflush(file);
+                fprintf(file, "%d: U %d: going home\n", (*line_log), idU);
+                (*line_log)++;
+                fflush(file);
             sem_post(print_sem);
+
             break;
         }
     }
-    // End process with 0
-    //exit(0);
 }
 
 //
@@ -244,7 +235,7 @@ void processMain(FILE *file, int F)
 
     usleep(ran); // @ran: Random time in interval <F/2 , F>
 
-    printf("POST time working - %d milliseconds\n", ran);
+    printf("POST time working - %d microseconds\n", ran);
 
     sem_wait(print_sem);
         fprintf(file, "%d: closing\n", (*line_log));
@@ -252,14 +243,6 @@ void processMain(FILE *file, int F)
         (*line_log)++;
         (*postOpened) = false;
     sem_post(print_sem);
-
-    printf("POST - %d\n", (*postOpened));
-    printf("QUEUE NULL - %d\n", queueIsNULL());
-
-    for (unsigned i = 0; i != sizeof(*queueList); ++i) {
-        printf("arr - %d\n", (queueList[i]));
-    }
-
 
     // End process with 0
     exit(0);
@@ -283,7 +266,7 @@ bool init_mem()
     ((print_sem = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
     ((first_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
     ((second_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) ||
-    ((third_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED)
+    ((third_queue = mmap(NULL, sizeof(sem_t), PROT_READ | PROT_WRITE, MAP_SHARED | MAP_ANONYMOUS, 0, 0)) == MAP_FAILED) //||
     ) {
         return false;
     }
@@ -317,21 +300,6 @@ bool init_semaphore()
     if (third_queue == SEM_FAILED)
         return false;
 
-//    third_queue = sem_open("/xdanyl00.ios.proj2.thirdQueueSem", O_CREAT | O_EXCL, 0666, 0);
-//    if (third_queue == SEM_FAILED)
-//        return false;
-
-//    if(
-//    (sem_init(mutex, 1, 1)) == -1 ||
-//    (sem_init(first_queue, 1, 0)) == -1 ||
-//    (sem_init(second_queue, 1, 0)) == -1 ||
-//    (sem_init(third_queue, 1, 0)) == -1
-//    )
-//    {
-//        return false;
-//    }
-
-
     return true;
 }
 
@@ -345,7 +313,7 @@ bool cleanup(FILE *file)
     (munmap((print_sem), sizeof(print_sem)) == -1) ||
     (munmap((first_queue), sizeof(first_queue)) == -1) ||
     (munmap((second_queue), sizeof(second_queue)) == -1) ||
-    (munmap((third_queue), sizeof(third_queue)) == -1)
+    (munmap((third_queue), sizeof(third_queue)) == -1) //||
     ) {
         return false;
     }
@@ -361,6 +329,7 @@ bool cleanup(FILE *file)
 
         sem_unlink("/xdanyl00.ios.proj2.thirdQueueSem");
         sem_close(third_queue);
+
     }
 
     if(
@@ -482,11 +451,7 @@ int randomQueuePick(){
             count++;
         }
     }
-
-    //srand(time(0));
     int random_index = arr[rand() % count];
-    printf("\nCount is: %d \n\n", count);
-    printf("\nRandom index value is: %d \n\n", random_index);
 
     return random_index;
 }
